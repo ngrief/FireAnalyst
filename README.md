@@ -24,7 +24,6 @@ This project analyzes California fire perimeter data to derive insights into fir
 
 3. **Spatial Analysis**:
    - Generates a heatmap of total fire area burned by decade.
-   - Plots fire locations on a map of California (requires latitude and longitude data).
 
 4. **Cause Analysis**:
    - Analyzes and summarizes fire causes (if present in the dataset).
@@ -41,20 +40,18 @@ This project analyzes California fire perimeter data to derive insights into fir
   - `pandas`
   - `matplotlib`
   - `seaborn`
-  - `folium`
 
 ## Usage
 1. Place the dataset in the `Resources` folder with the filename `California_Fire_Perimeters_(all).csv`.
 2. Run the script to:
    - Clean the dataset.
    - Perform analyses.
-   - Generate visualizations and geographic heatmaps.
-
+   - Generate visualizations and save them to the `Resources` folder.
 
 ## How to Run
 ```bash
 # Install required libraries
-pip install pandas matplotlib seaborn folium
+pip install pandas matplotlib seaborn
 
 # Run the script
 python FireStarter.py
@@ -62,12 +59,15 @@ python FireStarter.py
 
 ## Output
 - **Console**: Displays key metrics and analysis results (e.g., containment effectiveness, cause data).
-- **Visualizations**: Automatically generated and displayed.
-- **Interactive Map**: Saved as `California_Fire_Heatmap.html`.
+- **Visualizations**: Automatically generated and saved in the `Resources` folder:
+  - `fires_over_time.png`
+  - `peak_years_for_fires.png`
+  - `fires_by_decade.png`
+  - `fire_area_by_decade.png`
 
 ## Notes
 - Effectiveness is calculated as how quickly acreage was contained relative to fire size.
-- Latitude and longitude columns are required for spatial heatmaps.
+- Latitude and longitude columns are no longer required as geospatial analysis has been removed.
 
 ---
 
