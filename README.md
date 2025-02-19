@@ -16,12 +16,10 @@ This project analyzes **California fire perimeter data** to derive insights into
 ### 🔎 Key Analyses  
 
 #### **🔥 Containment Effectiveness**  
-- Measures fire containment effectiveness using the formula:  
+- Measures fire containment effectiveness using the formula:
 
-  \[
-  \text{Effectiveness} = \frac{\text{GIS_ACRES}}{\text{Containment Duration (hours)}}
-  \]  
-
+  Effectiveness = GIS_ACRES / Containment Duration(hours)
+    
 - Ranks containment methods based on average effectiveness.  
 
 #### **📈 Temporal Trends**  
