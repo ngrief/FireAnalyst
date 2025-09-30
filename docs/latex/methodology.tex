@@ -1,0 +1,464 @@
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Title Information
+\title{\textbf{Methodology Report} \\
+\large California Wildfire Analysis (1878--2023): \\
+Data Processing, Statistical Methods, and Validation}
+\author{FireAnalyst Research Team}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document describes the comprehensive methodology employed in analyzing historical California wildfire data spanning 145 years (1878--2023). We detail our data processing pipeline, validation procedures, statistical methods, and analytical framework. The analysis incorporates modern statistical techniques including hypothesis testing, confidence interval estimation, and effect size calculations. We critically examine our methodological limitations and propose improvements for future research.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%===================================
+\section{Introduction}
+%===================================
+
+\subsection{Research Objectives}
+
+This study aims to:
+\begin{enumerate}
+    \item Characterize temporal trends in California wildfire occurrence and severity
+    \item Identify seasonal patterns in fire ignition and spread
+    \item Analyze the effectiveness of different containment methods
+    \item Examine the role of various ignition sources
+    \item Provide statistically rigorous evidence for policy recommendations
+\end{enumerate}
+
+\subsection{Dataset Overview}
+
+The California Fire Perimeters dataset contains comprehensive records of wildfire incidents from 1878 to 2023, including:
+
+\begin{itemize}
+    \item Geographic extent (GIS\_ACRES)
+    \item Temporal information (ALARM\_DATE, CONT\_DATE)
+    \item Containment methods (C\_METHOD)
+    \item Fire causes (CAUSE)
+    \item Agency responses (AGENCY, UNIT\_ID)
+    \item Fire identifiers (FIRE\_NAME, INC\_NUM)
+\end{itemize}
+
+%===================================
+\section{Data Processing Pipeline}
+%===================================
+
+\subsection{Data Loading and Initial Assessment}
+
+Raw data was loaded from CSV format with initial validation of file integrity and structure. We documented:
+\begin{itemize}
+    \item Total record count: $N = 22{,}261$
+    \item Temporal span: 1878--2023 (145 years)
+    \item Missing data patterns by column
+    \item Data type inconsistencies
+\end{itemize}
+
+\subsection{Data Cleaning}
+
+\subsubsection{Missing Value Treatment}
+
+We applied the following cleaning procedures:
+
+\begin{enumerate}
+    \item \textbf{Essential columns}: Removed rows with missing values in YEAR\_ or GIS\_ACRES as these are fundamental to analysis
+    \item \textbf{Date columns}: Converted ALARM\_DATE and CONT\_DATE to datetime format with error handling for invalid dates
+    \item \textbf{Categorical imputation}: Filled missing agency identifiers with ``Unknown'' placeholder
+    \item \textbf{Column removal}: Dropped columns with $>50\%$ missing data or limited analytical utility (COMMENTS, COMPLEX\_NAME, IRWINID, COMPLEX\_ID, FIRE\_NUM)
+\end{enumerate}
+
+\subsubsection{Type Conversions}
+
+\begin{itemize}
+    \item YEAR\_ $\rightarrow$ integer
+    \item ALARM\_DATE, CONT\_DATE $\rightarrow$ datetime64[ns, UTC]
+    \item STATE $\rightarrow$ string
+\end{itemize}
+
+%===================================
+\section{Data Validation}
+%===================================
+
+\subsection{Validation Framework}
+
+We implemented a comprehensive six-stage validation protocol:
+
+\subsubsection{1. Temporal Logic Validation}
+
+\textbf{Test}: $\text{CONT\_DATE} \geq \text{ALARM\_DATE}$ for all records
+
+\textbf{Result}: 12 rows violated this constraint and were removed
+
+\textbf{Interpretation}: Containment cannot precede alarm; violations likely data entry errors
+
+\subsubsection{2. Future Date Detection}
+
+\textbf{Test}: $\text{ALARM\_DATE}, \text{CONT\_DATE} \leq \text{Current Date}$
+
+\textbf{Result}: No future dates detected
+
+\subsubsection{3. Outlier Detection}
+
+We employed the Interquartile Range (IQR) method for outlier identification:
+
+\begin{equation}
+\text{Outlier if: } x < Q_1 - 3 \cdot \text{IQR} \text{ or } x > Q_3 + 3 \cdot \text{IQR}
+\end{equation}
+
+where $\text{IQR} = Q_3 - Q_1$ and $Q_1$, $Q_3$ are the first and third quartiles.
+
+\textbf{GIS\_ACRES outliers}: 1{,}280 fires (13.3\% of validated dataset)
+
+\textbf{Decision}: Retained outliers as they represent legitimate extreme events (e.g., megafires)
+
+\subsubsection{4. Duration Validation}
+
+\textbf{Test}: Containment duration $\leq 8{,}760$ hours (1 year)
+
+\begin{equation}
+\text{Duration}_{\text{hours}} = \frac{(\text{CONT\_DATE} - \text{ALARM\_DATE})}{\text{3600 seconds}}
+\end{equation}
+
+\textbf{Result}: 3 fires exceeded 1-year containment threshold
+
+\textbf{Interpretation}: Likely represent complex multi-year incidents or data errors
+
+\subsubsection{5. Physical Constraint Validation}
+
+\textbf{Test}: GIS\_ACRES $> 0$
+
+\textbf{Result}: All records satisfied this constraint
+
+\subsubsection{6. Temporal Range Validation}
+
+\textbf{Validated year range}: 1912--2023
+
+\textbf{Note}: Pre-1912 records were sparse and removed during validation
+
+\subsection{Final Validation Summary}
+
+\begin{itemize}
+    \item \textbf{Initial records}: 22{,}261
+    \item \textbf{Records removed}: 12{,}574 (56.7\%)
+    \item \textbf{Final validated dataset}: 9{,}610 records (43.3\%)
+    \item \textbf{Validation issues}: 2 critical issues (date logic, extreme durations)
+\end{itemize}
+
+%===================================
+\section{Feature Engineering}
+%===================================
+
+We derived the following analytical features:
+
+\subsection{Temporal Features}
+
+\begin{align}
+\text{Containment\_Duration} &= \frac{(\text{CONT\_DATE} - \text{ALARM\_DATE})}{3600} \text{ hours} \\
+\text{Month} &= \text{month}(\text{ALARM\_DATE}) \in \{1, 2, \ldots, 12\} \\
+\text{Decade} &= \left\lfloor \frac{\text{YEAR\_}}{10} \right\rfloor \times 10
+\end{align}
+
+\subsection{Categorical Mappings}
+
+Applied human-readable descriptions for:
+\begin{itemize}
+    \item C\_METHOD: Numerical codes $\rightarrow$ containment method descriptions
+    \item CAUSE: Numerical codes $\rightarrow$ ignition source descriptions
+\end{itemize}
+
+%===================================
+\section{Statistical Methods}
+%===================================
+
+\subsection{Descriptive Statistics}
+
+For each continuous variable $X$, we computed:
+
+\begin{itemize}
+    \item Central tendency: $\bar{x} = \frac{1}{n}\sum_{i=1}^{n} x_i$, $\tilde{x}$ (median)
+    \item Dispersion: $s = \sqrt{\frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar{x})^2}$
+    \item Range: $[\min(x), \max(x)]$
+    \item Percentiles: $P_{25}, P_{50}, P_{75}, P_{90}, P_{95}, P_{99}$
+\end{itemize}
+
+\subsection{Inferential Statistics}
+
+\subsubsection{Temporal Trend Analysis}
+
+\textbf{Method}: Linear regression
+
+\textbf{Model}:
+\begin{equation}
+\text{Fire\_Count}_t = \beta_0 + \beta_1 \cdot \text{Year}_t + \epsilon_t
+\end{equation}
+
+\textbf{Null Hypothesis}: $H_0: \beta_1 = 0$ (no linear trend)
+
+\textbf{Test Statistic}: Pearson correlation coefficient $r$ with associated $t$-test
+
+\textbf{Significance Level}: $\alpha = 0.05$
+
+\subsubsection{Seasonal Pattern Analysis}
+
+\textbf{Method}: Chi-square goodness-of-fit test
+
+\textbf{Null Hypothesis}: $H_0$: Fire occurrence is uniformly distributed across months
+
+\textbf{Test Statistic}:
+\begin{equation}
+\chi^2 = \sum_{i=1}^{12} \frac{(O_i - E_i)^2}{E_i}
+\end{equation}
+
+where $O_i$ = observed fires in month $i$, $E_i = N/12$ = expected under uniform distribution
+
+\textbf{Degrees of Freedom}: $df = 11$
+
+\subsubsection{Containment Method Comparison}
+
+\textbf{Method}: One-way Analysis of Variance (ANOVA)
+
+\textbf{Null Hypothesis}: $H_0: \mu_1 = \mu_2 = \cdots = \mu_k$ (all methods have equal mean effectiveness)
+
+\textbf{Test Statistic}:
+\begin{equation}
+F = \frac{\text{MS}_{\text{between}}}{\text{MS}_{\text{within}}} = \frac{\frac{1}{k-1}\sum_{i=1}^{k}n_i(\bar{x}_i - \bar{x})^2}{\frac{1}{N-k}\sum_{i=1}^{k}\sum_{j=1}^{n_i}(x_{ij} - \bar{x}_i)^2}
+\end{equation}
+
+\textbf{Confidence Intervals}: 95\% CI for group means using $t$-distribution:
+\begin{equation}
+\text{CI}_{95\%} = \bar{x}_i \pm t_{0.025, n_i-1} \cdot \frac{s_i}{\sqrt{n_i}}
+\end{equation}
+
+\subsubsection{Decade Comparison}
+
+\textbf{Method}: Kruskal-Wallis H-test (non-parametric alternative to ANOVA)
+
+\textbf{Justification}: Fire size distributions are heavily right-skewed, violating ANOVA normality assumption
+
+\textbf{Null Hypothesis}: $H_0$: All decades have identical fire size distributions
+
+\textbf{Test Statistic}:
+\begin{equation}
+H = \frac{12}{N(N+1)} \sum_{i=1}^{k} \frac{R_i^2}{n_i} - 3(N+1)
+\end{equation}
+
+where $R_i$ = sum of ranks for decade $i$
+
+%===================================
+\section{Effectiveness Metric}
+%===================================
+
+\subsection{Current Definition}
+
+The containment effectiveness metric is defined as:
+
+\begin{equation}
+\text{Effectiveness} = \frac{\text{GIS\_ACRES}}{\text{Containment\_Duration (hours)}}
+\end{equation}
+
+Units: acres per hour
+
+\subsection{Critical Methodological Limitations}
+
+This metric has \textbf{fundamental flaws}:
+
+\begin{enumerate}
+    \item \textbf{Size Conflation}: Larger fires naturally require longer containment, regardless of suppression quality
+    \item \textbf{Uncontrolled Confounding}: Does not account for:
+    \begin{itemize}
+        \item Initial fire conditions (size at detection)
+        \item Weather variables (wind, humidity, temperature)
+        \item Terrain characteristics (slope, fuel load, accessibility)
+        \item Resource availability
+    \end{itemize}
+    \item \textbf{Ecological Fallacy}: Comparing aggregate metrics across methods without controlling for fire characteristics
+    \item \textbf{Selection Bias}: Different methods may be preferentially deployed for different fire types
+\end{enumerate}
+
+\subsection{Proposed Improvements}
+
+A more rigorous approach would:
+
+\begin{enumerate}
+    \item \textbf{Normalize by initial size}:
+    \begin{equation}
+    \text{Effectiveness}_{\text{norm}} = \frac{\text{Final\_Size} - \text{Initial\_Size}}{\text{Initial\_Size} \times \text{Duration}}
+    \end{equation}
+
+    \item \textbf{Control for confounders}: Use multiple regression
+    \begin{equation}
+    \text{Duration} = \beta_0 + \beta_1 \cdot \text{Size} + \beta_2 \cdot \text{Weather} + \beta_3 \cdot \text{Terrain} + \beta_4 \cdot \text{Method} + \epsilon
+    \end{equation}
+
+    \item \textbf{Propensity score matching}: Match fires by initial characteristics before comparing methods
+
+    \item \textbf{Survival analysis}: Model time-to-containment using Cox proportional hazards
+\end{enumerate}
+
+\subsection{Interpretation Guidelines}
+
+Given these limitations, current effectiveness results should be interpreted as:
+\begin{itemize}
+    \item \textbf{Descriptive only}: Characterizing observed patterns, not causal effects
+    \item \textbf{Hypothesis-generating}: Identifying methods for further investigation
+    \item \textbf{Preliminary}: Requiring validation with improved methodology
+\end{itemize}
+
+%===================================
+\section{Software Implementation}
+%===================================
+
+\subsection{Technology Stack}
+
+\begin{itemize}
+    \item \textbf{Language}: Python 3.12.4
+    \item \textbf{Core Libraries}: pandas 2.2.2, numpy 1.26.4, scipy 1.13.0
+    \item \textbf{Visualization}: matplotlib 3.8.4, seaborn 0.13.2
+    \item \textbf{Environment}: Jupyter notebooks for interactive analysis
+\end{itemize}
+
+\subsection{Code Organization}
+
+The analysis is structured as a modular Python package:
+
+\begin{verbatim}
+FireAnalyst/
+├── src/
+│   ├── config.py          # Configuration parameters
+│   ├── data_processing.py # Data pipeline
+│   ├── analysis.py        # Statistical methods
+│   └── visualization.py   # Plotting functions
+├── analysis.ipynb         # Main analysis notebook
+├── docs/
+│   └── latex/
+│       └── methodology.tex # This document
+└── requirements.txt       # Dependencies
+\end{verbatim}
+
+\subsection{Reproducibility}
+
+All analyses are fully reproducible via:
+\begin{enumerate}
+    \item Version-pinned dependencies (requirements.txt)
+    \item Random seed setting: 42
+    \item Automated data processing pipeline
+    \item Self-contained analysis notebook
+\end{enumerate}
+
+%===================================
+\section{Limitations and Future Work}
+%===================================
+
+\subsection{Data Limitations}
+
+\begin{enumerate}
+    \item \textbf{Temporal inconsistency}: Reporting standards likely changed over 145-year span
+    \item \textbf{Missing variables}: No weather, vegetation, or population density data
+    \item \textbf{Selection bias}: Historical records may preferentially document large fires
+    \item \textbf{Spatial aggregation}: County/unit level data masks local patterns
+\end{enumerate}
+
+\subsection{Methodological Limitations}
+
+\begin{enumerate}
+    \item \textbf{Effectiveness metric}: As detailed in Section 6, requires fundamental revision
+    \item \textbf{No spatial analysis}: Geographic patterns not examined
+    \item \textbf{No predictive modeling}: Analysis is purely retrospective
+    \item \textbf{Limited causal inference}: Observational data precludes strong causal claims
+\end{enumerate}
+
+\subsection{Recommendations for Future Research}
+
+\begin{enumerate}
+    \item \textbf{Integrate environmental data}: Weather, climate indices, vegetation
+    \item \textbf{Develop size-controlled metrics}: Control for initial fire characteristics
+    \item \textbf{Spatial analysis}: Examine geographic clustering and spread patterns
+    \item \textbf{Predictive modeling}: Machine learning for fire risk assessment
+    \item \textbf{Quasi-experimental designs}: Exploit natural experiments for causal inference
+    \item \textbf{Sensitivity analysis}: Test robustness of findings to analytical choices
+\end{enumerate}
+
+%===================================
+\section{Conclusion}
+%===================================
+
+This methodology provides a rigorous, reproducible framework for analyzing historical wildfire data. While we identify significant limitations—particularly regarding the effectiveness metric—the analysis establishes a solid foundation for understanding California wildfire patterns. The modular code structure facilitates future improvements and extensions.
+
+Key methodological strengths include:
+\begin{itemize}
+    \item Comprehensive data validation
+    \item Appropriate statistical tests with stated assumptions
+    \item Full documentation and reproducibility
+    \item Critical assessment of limitations
+\end{itemize}
+
+This work should be viewed as a starting point for more sophisticated analyses incorporating environmental covariates, spatial methods, and improved causal inference techniques.
+
+%===================================
+\bibliographystyle{plain}
+\bibliography{references}
+
+\appendix
+
+\section{Data Dictionary}
+
+\begin{table}[h]
+\centering
+\caption{Variable Definitions}
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Type} & \textbf{Description} \\
+\midrule
+YEAR\_ & Integer & Year of fire occurrence \\
+GIS\_ACRES & Float & Fire area in acres \\
+ALARM\_DATE & Datetime & Date/time fire was reported \\
+CONT\_DATE & Datetime & Date/time fire was contained \\
+C\_METHOD & Integer & Containment method code (1--8) \\
+CAUSE & Integer & Fire cause code (1--19) \\
+AGENCY & String & Responding agency \\
+FIRE\_NAME & String & Fire identifier name \\
+Containment\_Duration & Float & Hours from alarm to containment \\
+Month & Integer & Month of alarm (1--12) \\
+Decade & Integer & Decade of occurrence \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Statistical Test Details}
+
+\subsection{ANOVA Assumptions}
+
+\begin{enumerate}
+    \item Independence: Assumed; fires are independent events
+    \item Normality: Violated (right-skewed distributions); ANOVA is robust to moderate violations with large samples
+    \item Homogeneity of variance: Tested via Levene's test (if violated, use Welch's ANOVA)
+\end{enumerate}
+
+\subsection{Multiple Testing Correction}
+
+With multiple hypothesis tests, consider Bonferroni correction:
+\begin{equation}
+\alpha_{\text{corrected}} = \frac{\alpha}{m}
+\end{equation}
+where $m$ = number of tests performed.
+
+\end{document}
